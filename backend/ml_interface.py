@@ -3,8 +3,8 @@ import numpy as np
 import librosa
 
 # Constants
-RATE = 44100 # Sample rate expected by feature extraction
-BUFFER_DURATION_SECONDS = 5 # Target duration for ML processing
+RATE = 16000  # New Sample rate (Hz) - MUST MATCH audio_handler.py
+BUFFER_DURATION_SECONDS = 2  # New Duration to buffer audio before processing (seconds)
 TARGET_SAMPLES = int(BUFFER_DURATION_SECONDS * RATE)
 
 def extract_features_from_chunk(audio_chunk, sr):
@@ -59,12 +59,19 @@ def extract_features_from_chunk(audio_chunk, sr):
         return None
 
 
-def buffer_and_analyze_audio(ml_input_queue, ml_output_queue, warning_queue):
+# Modified function signature to include source_id
+def buffer_and_analyze_audio(source_id, ml_input_queue, ml_output_queue, warning_queue):
     """
-    Buffers audio chunks to ~5 seconds, extracts features, interacts with ML model,
-    and sends warnings.
+    Buffers audio chunks for a specific source, extracts features, interacts with ML model,
+    and sends tagged warnings.
+
+    Args:
+        source_id: An identifier for the audio source (e.g., (device_index, channel_index)).
+        ml_input_queue: Queue to receive audio chunks for this source.
+        ml_output_queue: Queue for potential ML output (currently unused).
+        warning_queue: Shared queue to put tagged warnings (source_id, message).
     """
-    print(f"ML Interface: Starting... Buffering for {BUFFER_DURATION_SECONDS} seconds.")
+    print(f"ML Interface [{source_id}]: Starting... Buffering for {BUFFER_DURATION_SECONDS} seconds.")
     # Placeholder: Load or connect to your actual ML model here
     # ml_model = load_my_model()
 
@@ -76,11 +83,16 @@ def buffer_and_analyze_audio(ml_input_queue, ml_output_queue, warning_queue):
             # Get the next audio chunk intended for ML
             chunk = ml_input_queue.get() # Blocks until a chunk is available
 
+            # --- Add this print statement ---
+            # chunk_size_info = chunk.size if isinstance(chunk, np.ndarray) else 'N/A (None or other type)'
+            # print(f"ML Interface [{source_id}]: Got chunk from queue (type: {type(chunk)}, size: {chunk_size_info})")
+            # ---------------------------------
+
             if chunk is None: # Shutdown signal
-                print("ML Interface: Received shutdown signal.")
+                print(f"ML Interface [{source_id}]: Received shutdown signal.")
                 # Optional: Process any remaining data in the buffer before exiting
                 if audio_buffer:
-                    print(f"ML Interface: Processing remaining {buffered_samples / RATE:.2f} seconds before shutdown.")
+                    print(f"ML Interface [{source_id}]: Processing remaining {buffered_samples / RATE:.2f} seconds before shutdown.")
                     combined_chunk = np.concatenate(audio_buffer)
                     features = extract_features_from_chunk(combined_chunk, RATE)
                     if features is not None and features.shape[0] > 0:
@@ -93,9 +105,10 @@ def buffer_and_analyze_audio(ml_input_queue, ml_output_queue, warning_queue):
 
                         if ml_result and ml_result.get("warning"):
                             warning_message = ml_result["warning"]
-                            print(f"ML Interface: Detected '{warning_message}'")
+                            print(f"ML Interface [{source_id}]: Detected '{warning_message}'")
                             if not warning_queue.full():
-                                warning_queue.put(warning_message)
+                                # Put tagged warning
+                                warning_queue.put((source_id, warning_message))
                 break # Exit the loop
 
             # --- Buffer the chunk ---
@@ -106,7 +119,7 @@ def buffer_and_analyze_audio(ml_input_queue, ml_output_queue, warning_queue):
                     # Assuming float32 data is coming, adjust if needed (e.g., frombuffer)
                     chunk_np = np.array(chunk, dtype=np.float32)
                 except ValueError:
-                    print("ML Interface: Warning - Could not convert incoming chunk to numpy array. Skipping.")
+                    print(f"ML Interface [{source_id}]: Warning - Could not convert incoming chunk to numpy array. Skipping.")
                     continue
             else:
                 chunk_np = chunk
@@ -116,12 +129,20 @@ def buffer_and_analyze_audio(ml_input_queue, ml_output_queue, warning_queue):
 
             # --- Check if buffer is full enough ---
             if buffered_samples >= TARGET_SAMPLES:
-                print(f"ML Interface: Processing buffer ({buffered_samples / RATE:.2f} seconds)")
+                print(f"ML Interface [{source_id}]: Processing buffer ({buffered_samples / RATE:.2f} seconds)")
                 # Combine buffered chunks into one large chunk
                 combined_chunk = np.concatenate(audio_buffer)
 
-                # Extract features from the combined chunk
-                features = extract_features_from_chunk(combined_chunk, RATE)
+                # --- Add Normalization Step ---
+                peak_value = np.max(np.abs(combined_chunk))
+                if peak_value > 1e-6: # Avoid division by zero or near-zero
+                    normalized_chunk = combined_chunk / peak_value
+                else:
+                    normalized_chunk = combined_chunk # Keep as is if silent/zero
+                # -----------------------------
+
+                # Extract features from the *normalized* chunk
+                features = extract_features_from_chunk(normalized_chunk, RATE) # Use normalized_chunk
 
                 if features is not None and features.shape[0] > 0:
                     # --- Placeholder: Interact with the actual ML model ---
@@ -138,92 +159,20 @@ def buffer_and_analyze_audio(ml_input_queue, ml_output_queue, warning_queue):
                     # --- Process ML Result ---
                     if ml_result and ml_result.get("warning"):
                         warning_message = ml_result["warning"]
-                        print(f"ML Interface: Detected '{warning_message}'")
-                        # Send warning to frontend communicator
+                        print(f"ML Interface [{source_id}]: Detected '{warning_message}'")
+                        # Send tagged warning to the shared queue
                         if not warning_queue.full():
-                            warning_queue.put(warning_message)
+                            warning_queue.put((source_id, warning_message)) # Put tuple
                 else:
-                    print("ML Interface: Skipping buffer due to feature extraction issue.")
+                    print(f"ML Interface [{source_id}]: Skipping buffer due to feature extraction issue.")
 
                 # Clear the buffer for the next segment
                 audio_buffer = []
                 buffered_samples = 0
 
     except KeyboardInterrupt:
-        print("ML Interface: Interrupted.")
+        print(f"ML Interface [{source_id}]: Interrupted.")
     except Exception as e:
-        print(f"ML Interface: An error occurred: {e}")
+        print(f"ML Interface [{source_id}]: An error occurred: {e}")
     finally:
-        print("ML Interface: Stopped.")
-
-
-
-
-
-'''
-# Example of how this might be run (in main_backend.py)
-if __name__ == '__main__':
-    # This part is just for testing the module directly, not for production run
-    from multiprocessing import Queue
-    import numpy as np
-    import time # Needed for sleep
-
-    # --- Test 1: Direct call to extract_features_from_chunk (keep this) ---
-    test_duration_seconds = 1.0
-    dummy_chunk_for_extract = np.random.uniform(-0.5, 0.5, size=int(RATE * test_duration_seconds))
-    print(f"--- Testing extract_features_from_chunk ---")
-    print(f"Generated dummy_chunk shape: {dummy_chunk_for_extract.shape}")
-    print(f"Dummy chunk duration: {len(dummy_chunk_for_extract)/RATE:.2f} seconds")
-    features = extract_features_from_chunk(dummy_chunk_for_extract, RATE)
-    if features is not None:
-        print(f"Extracted features matrix shape: {features.shape}")
-        print(f"(Shape means: {features.shape[0]} time steps, {features.shape[1]} features [RMS, ZCR, Onset Strength])")
-        print("First 5 feature vectors:")
-        print(features[:5, :])
-    else:
-        print("Feature extraction failed for the dummy chunk.")
-    print("---------------------------------------------")
-
-    # --- Test 2: Testing process_for_ml with queues ---
-    print(f"\n--- Testing process_for_ml (using queues) ---")
-    in_q = Queue()
-    out_q = Queue() # Not strictly checked in this test, but needed by the function
-    warn_q = Queue()
-
-    # Simulate sending chunks over time (e.g., 6 seconds worth)
-    chunk_size = 1024 # Typical chunk size
-    total_test_duration_sec = 6.0
-    num_chunks_to_send = int((total_test_duration_sec * RATE) / chunk_size)
-
-    print(f"Simulating sending {num_chunks_to_send} chunks (each {chunk_size} samples) over ~{total_test_duration_sec}s...")
-    print(f"Target buffer duration is {BUFFER_DURATION_SECONDS}s. Expecting one processing cycle.")
-
-    # Put chunks onto the input queue
-    for i in range(num_chunks_to_send):
-        dummy_chunk = np.random.uniform(-0.5, 0.5, size=chunk_size).astype(np.float32)
-        in_q.put(dummy_chunk)
-        # time.sleep(0.001) # Optional small sleep to simulate real-time arrival
-
-    # Send the shutdown signal
-    print("Sending shutdown signal (None) to input queue.")
-    in_q.put(None)
-
-    # Run the function (usually in a separate process, but run directly for this test)
-    print("Starting process_for_ml...")
-    process_for_ml(in_q, out_q, warn_q)
-    print("process_for_ml finished.")
-
-    # Check the warning queue for results
-    print("Checking warning queue...")
-    warnings_received = []
-    while not warn_q.empty():
-        warnings_received.append(warn_q.get_nowait())
-
-    if warnings_received:
-        print(f"Received {len(warnings_received)} warning(s):")
-        for warning in warnings_received:
-            print(f" - {warning}")
-    else:
-        print("No warnings received from the warning queue.")
-    print("---------------------------------------------")
-'''
+        print(f"ML Interface [{source_id}]: Stopped.")
