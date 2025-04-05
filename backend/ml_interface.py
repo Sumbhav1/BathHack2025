@@ -4,11 +4,14 @@ import librosa
 import os # Added for path manipulation
 from datetime import datetime # Added for unique filenames
 import librosa.onset # Explicitly import if needed, though librosa.feature.onset should work
+from joblib import load
+import random
 
 # Constants
 RATE = 16000  # New Sample rate (Hz) - MUST MATCH audio_handler.py
 BUFFER_DURATION_SECONDS = 2  # New Duration to buffer audio before processing (seconds)
 TARGET_SAMPLES = int(BUFFER_DURATION_SECONDS * RATE)
+ml_model = load('ML_MODEL/audio_popping_classifier_model.joblib') #Load ML model
 
 # Ensure the temporary directory exists
 TEMP_FEATURE_DIR = os.path.join(os.path.dirname(__file__), '..', 'temp', 'ml_features')
@@ -118,9 +121,8 @@ def buffer_and_analyze_audio(source_id, ml_input_queue, ml_output_queue, warning
                     combined_chunk = np.concatenate(audio_buffer)
                     features = extract_features_from_chunk(combined_chunk, RATE)
                     if features is not None and features.shape[0] > 0:
-                        # --- Perform ML prediction on remaining data (simulation) ---
-                        import random
-                        if random.random() < 0.05:
+                        # --- Perform ML prediction on remaining data (simulation) --- 
+                        if random.random() < 0:
                            ml_result = {"warning": "popping detected (final)"}
                         else:
                            ml_result = {"warning": None}
@@ -182,23 +184,12 @@ def buffer_and_analyze_audio(source_id, ml_input_queue, ml_output_queue, warning
 
                 if features is not None and features.shape[0] > 0:
                     # --- Placeholder: Interact with the actual ML model ---
-                    # prediction = ml_model.predict(features) # Example
-
-                    # Simulate receiving a result (replace with actual model interaction)
-                    time.sleep(0.05) # Simulate processing time
-                    import random
-                    if random.random() < 0.05: # Simulate a 5% chance of detecting popping
-                       ml_result = {"warning": "popping detected"}
-                    else:
-                       ml_result = {"warning": None}
-
-                    # --- Process ML Result ---
-                    if ml_result and ml_result.get("warning"):
-                        warning_message = ml_result["warning"]
+                    prediction = ml_model.predict(features) # Example
+                    if np.any(prediction == 1):
+                        warning_message = "popping detected"
                         print(f"ML Interface [{source_id}]: Detected '{warning_message}'")
-                        # Send tagged warning to the shared queue
                         if not warning_queue.full():
-                            warning_queue.put((source_id, warning_message)) # Put tuple
+                            warning_queue.put((source_id, warning_message))
                 else:
                     print(f"ML Interface [{source_id}]: Skipping buffer due to feature extraction issue.")
 
