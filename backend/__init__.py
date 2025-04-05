@@ -1,5 +1,12 @@
-# from .backend_service import BackendService
-# from .audio_manager import AudioManager
-# from .feature_processor import FeatureProcessor
+from .backend_service import BackendService
+from .audio_manager import AudioManager
+from .feature_processor import FeatureProcessor
 
-# __all__ = ['BackendService', 'AudioManager', 'FeatureProcessor']
+# This makes BackendService directly importable from the backend package
+# e.g., from backend import BackendService
+
+__all__ = [
+    'BackendService',
+    'AudioManager',
+    'FeatureProcessor'
+]
