@@ -1,5 +1,0 @@
-rms
-zcr
-onset
-centroid
-flatness
