@@ -1,11 +1,17 @@
 import time
 import numpy as np
 import librosa
+import os # Added for path manipulation
+from datetime import datetime # Added for unique filenames
 
 # Constants
 RATE = 16000  # New Sample rate (Hz) - MUST MATCH audio_handler.py
 BUFFER_DURATION_SECONDS = 2  # New Duration to buffer audio before processing (seconds)
 TARGET_SAMPLES = int(BUFFER_DURATION_SECONDS * RATE)
+
+# Ensure the temporary directory exists
+TEMP_FEATURE_DIR = os.path.join(os.path.dirname(__file__), '..', 'temp', 'ml_features')
+os.makedirs(TEMP_FEATURE_DIR, exist_ok=True)
 
 def extract_features_from_chunk(audio_chunk, sr):
     """Extracts features (RMS, ZCR, Onset Strength) from a raw audio chunk."""
@@ -84,8 +90,8 @@ def buffer_and_analyze_audio(source_id, ml_input_queue, ml_output_queue, warning
             chunk = ml_input_queue.get() # Blocks until a chunk is available
 
             # --- Add this print statement ---
-            # chunk_size_info = chunk.size if isinstance(chunk, np.ndarray) else 'N/A (None or other type)'
-            # print(f"ML Interface [{source_id}]: Got chunk from queue (type: {type(chunk)}, size: {chunk_size_info})")
+            chunk_size_info = chunk.size if isinstance(chunk, np.ndarray) else 'N/A (None or other type)'
+            # print(f"ML Interface [{source_id}]: Got chunk from queue (type: {type(chunk)}, size: {chunk_size_info})") # Keep commented unless debugging queue itself
             # ---------------------------------
 
             if chunk is None: # Shutdown signal
@@ -143,6 +149,20 @@ def buffer_and_analyze_audio(source_id, ml_input_queue, ml_output_queue, warning
 
                 # Extract features from the *normalized* chunk
                 features = extract_features_from_chunk(normalized_chunk, RATE) # Use normalized_chunk
+
+                # --- TEMPORARY: Save features to file ---
+                if features is not None and features.shape[0] > 0:
+                    try:
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                        # Sanitize source_id for filename (replace tuple chars)
+                        safe_source_id = str(source_id).replace(', ', '_').strip('()')
+                        filename = f"features_src{safe_source_id}_{timestamp}.npy"
+                        filepath = os.path.join(TEMP_FEATURE_DIR, filename)
+                        np.save(filepath, features)
+                        # print(f"ML Interface [{source_id}]: Saved features to {filepath}") # Optional: uncomment for verbose logging
+                    except Exception as e:
+                        print(f"ML Interface [{source_id}]: Error saving features: {e}")
+                # -----------------------------------------
 
                 if features is not None and features.shape[0] > 0:
                     # --- Placeholder: Interact with the actual ML model ---
