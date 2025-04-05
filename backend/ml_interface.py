@@ -3,6 +3,7 @@ import numpy as np
 import librosa
 import os # Added for path manipulation
 from datetime import datetime # Added for unique filenames
+import librosa.onset # Explicitly import if needed, though librosa.feature.onset should work
 
 # Constants
 RATE = 16000  # New Sample rate (Hz) - MUST MATCH audio_handler.py
@@ -14,54 +15,69 @@ TEMP_FEATURE_DIR = os.path.join(os.path.dirname(__file__), '..', 'temp', 'ml_fea
 os.makedirs(TEMP_FEATURE_DIR, exist_ok=True)
 
 def extract_features_from_chunk(audio_chunk, sr):
-    """Extracts features (RMS, ZCR, Onset Strength) from a raw audio chunk."""
+    """
+    Extracts RMS, ZCR, Onset Strength, Spectral Centroid, and Spectral Flatness from an audio chunk.
+
+    Args:
+        audio_chunk (np.ndarray): The 1D audio data (should be normalized if desired).
+        sr (int): The sample rate.
+
+    Returns:
+        np.ndarray: A 2D numpy array (num_frames, 5) where each row represents a time frame
+                    and columns represent different features.
+                    Features (columns): [RMS, ZCR, Onset Strength, Spectral Centroid, Spectral Flatness]
+                    Returns None if an error occurs or the chunk is too short.
+    """
     try:
-        # Ensure chunk is numpy array and potentially flatten if needed
-        if not isinstance(audio_chunk, np.ndarray):
-            # This might depend on how chunks arrive (e.g., from sounddevice)
-            audio_chunk = np.array(audio_chunk, dtype=np.float32).flatten()
-        elif audio_chunk.ndim > 1:
-             # Flatten if it's multi-channel, feature extraction expects mono
-             audio_chunk = audio_chunk.flatten()
+        # Define consistent analysis parameters
+        n_fft = 2048
+        hop_length = 512 # Default hop_length for many librosa features
 
-        if len(audio_chunk) == 0:
-            print("Warning: Received empty audio chunk.")
+        # Check if audio chunk is long enough for FFT
+        if len(audio_chunk) < n_fft:
+            print(f"Warning: Audio chunk length ({len(audio_chunk)}) is shorter than n_fft ({n_fft}). Skipping feature extraction.")
             return None
 
-        # --- Extract Core Features ---
-        # Adjust parameters like hop_length if needed for chunk-based processing
-        # hop_length = 512 # Example, default for librosa features
+        # 1. RMS Energy (returns shape (1, n_frames), get [0] for 1D)
+        rms = librosa.feature.rms(y=audio_chunk, frame_length=n_fft, hop_length=hop_length)[0]
 
-        # 1. RMS Energy
-        rms = librosa.feature.rms(y=audio_chunk)[0] # hop_length=hop_length
+        # 2. Zero-Crossing Rate (returns shape (1, n_frames), get [0] for 1D)
+        zcr = librosa.feature.zero_crossing_rate(y=audio_chunk, frame_length=n_fft, hop_length=hop_length)[0]
 
-        # 2. Zero Crossing Rate
-        zcr = librosa.feature.zero_crossing_rate(y=audio_chunk)[0] # hop_length=hop_length
+        # 3. Onset Strength (returns 1D array)
+        onset_strength = librosa.onset.onset_strength(y=audio_chunk, sr=sr, hop_length=hop_length)
 
-        # 3. Onset Strength Envelope
-        # Note: Onset strength might be less meaningful on very short chunks
-        # Consider if this feature is appropriate for real-time chunks
-        onset_env = librosa.onset.onset_strength(y=audio_chunk, sr=sr) # hop_length=hop_length
+        # 4. Spectral Centroid (returns shape (1, n_frames), get [0] for 1D)
+        spectral_centroid = librosa.feature.spectral_centroid(y=audio_chunk, sr=sr, n_fft=n_fft, hop_length=hop_length)[0]
 
-        # --- Align and Combine Features ---
-        # The length alignment might behave differently with chunks vs full files
-        min_len = min(len(rms), len(zcr), len(onset_env))
-        if min_len == 0:
-            print("Warning: Could not extract features from chunk.")
-            return None
+        # 5. Spectral Flatness (returns shape (1, n_frames), get [0] for 1D)
+        spectral_flatness = librosa.feature.spectral_flatness(y=audio_chunk, n_fft=n_fft, hop_length=hop_length)[0]
 
-        rms = rms[:min_len]
-        zcr = zcr[:min_len]
-        onset_env = onset_env[:min_len]
+        # Ensure all features have the same number of frames (columns)
+        # Use the length of RMS as the target, as it's usually consistent
+        target_frames = rms.shape[0]
 
-        # Combine features: Result shape will be (min_len, 3)
-        feature_matrix = np.vstack([rms, zcr, onset_env]).T
-        # print(f"Extracted feature matrix shape: {feature_matrix.shape}") # Debug print
+        # Resize other features if necessary (simple resize, might truncate/repeat)
+        onset_strength = np.resize(onset_strength, target_frames)
+        spectral_centroid = np.resize(spectral_centroid, target_frames)
+        spectral_flatness = np.resize(spectral_flatness, target_frames)
+        zcr = np.resize(zcr, target_frames) # Also resize ZCR just in case
 
-        return feature_matrix
+        # Stack the 1D feature arrays vertically to create the 2D matrix (5, num_frames)
+        features = np.vstack((rms, zcr, onset_strength, spectral_centroid, spectral_flatness))
+
+        # Transpose the matrix to shape (num_frames, 5)
+        features = features.T
+
+        # Verify shape is (N, 5)
+        if features.shape[1] != 5:
+             print(f"Error: Feature matrix has unexpected shape: {features.shape}")
+             return None # Or raise an error
+
+        return features
 
     except Exception as e:
-        print(f"Error extracting features from chunk: {e}")
+        print(f"Error extracting features: {e}")
         return None
 
 
