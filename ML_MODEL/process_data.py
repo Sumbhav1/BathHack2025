@@ -8,14 +8,11 @@ RATE = 16000  # Match sample rate with ml_interface.py
 n_fft = 2048  # Match FFT size with ml_interface.py
 hop_length = 512  # Consistent hop length
 
-def extract_features_from_file(audio_path):
-    """Loads an audio file, extracts frame-level features, and returns the feature matrix."""
+def extract_features_from_file(audio_data, sr=RATE):
+    """Extracts frame-level features from audio data."""
     try:
-        audio_data, sr = librosa.load(audio_path, sr=RATE, mono=True)
-        print(f"Loaded '{audio_path}', Sample Rate: {sr}, Duration: {len(audio_data)/sr:.2f}s")
-
         if len(audio_data) == 0:
-            print(f"Warning: Audio file '{audio_path}' is empty or could not be loaded properly.")
+            print("Warning: Audio data is empty")
             return None
 
         # Normalize audio (peak normalization)
@@ -31,7 +28,7 @@ def extract_features_from_file(audio_path):
         # Extract features using consistent parameters
         rms = librosa.feature.rms(y=audio_data, frame_length=n_fft, hop_length=hop_length)[0]
         zcr = librosa.feature.zero_crossing_rate(y=audio_data, frame_length=n_fft, hop_length=hop_length)[0]
-        onset_env = librosa.onset.onset_strength(y=audio_data, sr=RATE, hop_length=hop_length)
+        onset_env = librosa.onset.onset_strength(y=audio_data, sr=sr, hop_length=hop_length)
         spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sr, n_fft=n_fft, hop_length=hop_length)[0]
         spectral_flatness = librosa.feature.spectral_flatness(y=audio_data, n_fft=n_fft, hop_length=hop_length)[0]
 
@@ -49,32 +46,53 @@ def extract_features_from_file(audio_path):
         return feature_matrix
 
     except Exception as e:
-        print(f"Error processing file '{audio_path}': {e}")
+        print(f"Error processing audio data: {e}")
         return None
 
 def process_directory(directory_path):
-    """Process all audio files in the directory and return features and labels."""
+    """Process all audio files, padding shorter clips to 2 seconds."""
     features = []
     labels = []
-
+    
+    chunk_size = 2 * RATE  # 2 seconds at 16kHz
+    
     for label_dir in os.listdir(directory_path):
         label_path = os.path.join(directory_path, label_dir)
         if os.path.isdir(label_path):
-            # Set the label based on the folder name
-            label = 0 if label_dir == "GoodSound" else 1  # 0 for "good", 1 for "bad"
+            label = 0 if label_dir == "GoodSound" else 1
             
             for filename in os.listdir(label_path):
-                if filename.endswith(".wav"):  # Process only .wav files
+                if filename.endswith(".wav"):
                     audio_path = os.path.join(label_path, filename)
-                    feature_matrix = extract_features_from_file(audio_path)
+                    print(f"Processing file: {filename}")  # Debug print
                     
-                    if feature_matrix is not None:
-                        features.append(feature_matrix)
-                        # Label all frames in this clip with the clip's label
-                        labels.extend([label] * len(feature_matrix))  # One label per frame
+                    # Load audio
+                    audio_data, sr = librosa.load(audio_path, sr=RATE, mono=True)
+                    print(f"Loaded audio length: {len(audio_data)/RATE:.2f} seconds")  # Debug print
+                    
+                    if len(audio_data) < n_fft:
+                        print(f"Skipping {filename} - too short for FFT")
+                        continue
+                        
+                    # Process the audio data
+                    if len(audio_data) < chunk_size:
+                        # For short clips, process as-is without padding
+                        feature_matrix = extract_features_from_file(audio_data, sr)
+                        if feature_matrix is not None:
+                            features.append(feature_matrix)
+                            labels.extend([label] * len(feature_matrix))
+                            print(f"Processed short clip: {feature_matrix.shape}")  # Debug print
                     else:
-                        print(f"Skipping file {filename} due to extraction failure.")
-
+                        # For longer clips, process in 2-second chunks
+                        for i in range(0, len(audio_data), chunk_size):
+                            chunk = audio_data[i:i + chunk_size]
+                            if len(chunk) >= n_fft:  # Only process if chunk is long enough for FFT
+                                feature_matrix = extract_features_from_file(chunk, sr)
+                                if feature_matrix is not None:
+                                    features.append(feature_matrix)
+                                    labels.extend([label] * len(feature_matrix))
+                                    print(f"Processed chunk: {feature_matrix.shape}")  # Debug print
+    
     return features, labels
 
 def save_features_and_labels(features, labels, output_dir, dataset_name):

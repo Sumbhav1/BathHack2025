@@ -5,7 +5,7 @@ from joblib import dump
 from sklearn.metrics import classification_report
 
 # Constants
-MODEL_PATH = 'ML_MODEL/models/audio_popping_classifier_model_normalised.joblib'
+MODEL_PATH = 'ML_MODEL/models/audio_popping_classifier_model_normalisedv7.joblib'
 
 # Load the processed data
 X = np.load('ML_MODEL/ProcessedData/training_data_features.npy')

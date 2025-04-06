@@ -13,7 +13,7 @@ BUFFER_DURATION_SECONDS = 2  # New Duration to buffer audio before processing (s
 TARGET_SAMPLES = int(BUFFER_DURATION_SECONDS * RATE)
 N_FFT = 2048  # FFT window size for feature extraction
 HOP_LENGTH = 512  # Hop length for feature extraction
-MODEL_PATH = 'ML_MODEL/models/audio_popping_classifier_model_normalised.joblib'  # Path to ML model
+MODEL_PATH = 'ML_MODEL/models/audio_popping_classifier_model_normalisedv7.joblib'  # Path to ML model
 ml_model = load(MODEL_PATH)  # Load ML model
 
 # Ensure the temporary directory exists
@@ -182,19 +182,42 @@ def buffer_and_analyze_audio(source_id, ml_input_queue, ml_output_queue, warning
                 # -----------------------------------------
 
                 if features is not None and features.shape[0] > 0:
-                    # --- Placeholder: Interact with the actual ML model ---
-                    prediction = ml_model.predict(features) # Example
+                    prediction = ml_model.predict(features)
                     
-                    # Count consecutive positive predictions
-                    # Using 3 consecutive frames as threshold
-                    consecutive_pops = sum(1 for i in range(len(prediction)-2) 
-                                        if prediction[i:i+3].all())
+                    # Debug: Print raw predictions
+                    pop_frames = np.where(prediction == 1)[0]
+                    if len(pop_frames) > 0:
+                        print(f"ML Interface [{source_id}]: Raw predictions show pops at frames: {pop_frames}")
+                        print(f"ML Interface [{source_id}]: Total frames: {len(prediction)}, Number of pop frames: {len(pop_frames)}")
                     
-                    if consecutive_pops > 0:  # If we find any sequence of 3+ consecutive pop frames
-                        warning_message = "popping detected"
-                        print(f"ML Interface [{source_id}]: Detected '{warning_message}' - {consecutive_pops} sequences")
-                        if not warning_queue.full():
-                            warning_queue.put((source_id, warning_message))
+                    # New detection logic with maximum cluster size
+                    MAX_CLUSTER_SIZE = 30  # Maximum allowed frames in a cluster
+                    
+                    if len(pop_frames) > 0:
+                        clusters = []
+                        current_cluster = [pop_frames[0]]
+                        
+                        # Group nearby frames into clusters
+                        for i in range(1, len(pop_frames)):
+                            if pop_frames[i] - pop_frames[i-1] <= 3:  # Within 3 frames
+                                current_cluster.append(pop_frames[i])
+                            else:
+                                # Only keep clusters with 2+ frames AND less than MAX_CLUSTER_SIZE frames
+                                if 2 <= len(current_cluster) < MAX_CLUSTER_SIZE:
+                                    clusters.append(current_cluster)
+                                current_cluster = [pop_frames[i]]
+                        
+                        # Don't forget the last cluster
+                        if 2 <= len(current_cluster) < MAX_CLUSTER_SIZE:
+                            clusters.append(current_cluster)
+                        
+                        # Trigger warning if we found any valid clusters
+                        if clusters:
+                            warning_message = "popping detected"
+                            print(f"ML Interface [{source_id}]: Detected '{warning_message}' - {len(clusters)} clusters")
+                            if not warning_queue.full():
+                                warning_queue.put((source_id, warning_message))
+                
                 else:
                     print(f"ML Interface [{source_id}]: Skipping buffer due to feature extraction issue.")
 

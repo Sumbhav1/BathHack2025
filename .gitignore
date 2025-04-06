@@ -1,3 +1,5 @@
 venv/
 temp/
 __pycache__/
+NewSamples/
+AudioSamples/
