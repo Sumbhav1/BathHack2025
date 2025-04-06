@@ -1,0 +1,31 @@
+/* components/DeviceSelector.css */
+.device-selector {
+    padding: 20px;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    margin-bottom: 20px;
+  }
+  
+  .device-dropdown {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid #ccc;
+    font-size: 16px;
+    background-color: #fff;
+    cursor: pointer;
+  }
+  
+  .device-dropdown:focus {
+    outline: none;
+    border-color: #007bff;
+  }
+  
+  .device-dropdown option {
+    padding: 10px;
+  }
+  
+  

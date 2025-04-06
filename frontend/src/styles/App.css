@@ -1,0 +1,49 @@
+ /* App.css */
+.app {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background-color: #f4f4f4;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  
+  .device-selection {
+    margin-bottom: 20px;
+  }
+  
+  .device-selector {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .device-selector label {
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  
+  .device-selector select {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 2px solid #ccc;
+    width: 100%;
+  }
+  
+  .device-details {
+    margin-top: 20px;
+  }
+  
+  .warning-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 15px;
+    z-index: 1000;
+  }
+  
+  
