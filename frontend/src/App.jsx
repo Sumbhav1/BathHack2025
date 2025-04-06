@@ -1,66 +1,45 @@
 import React, { useState, useEffect } from "react";
-import { FaPlus } from "react-icons/fa";
 import { io } from "socket.io-client";
 import DeviceSelector from "./components/DeviceSelector";
 import ChannelSelector from "./components/ChannelSelector";
-import WarningPopUp from "./components/WarningPopUp";
 import "./styles/App.css";
 
 const App = () => {
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [selectedChannel, setSelectedChannel] = useState(null);
-  const [warnings, setWarnings] = useState([]);
   const [activeDevices, setActiveDevices] = useState([]);
-  const [socket, setSocket] = useState(null);
 
-  // Initialize socket connection
+  // Connect to websocket server
   useEffect(() => {
-    const newSocket = io("http://localhost:5000");
-    setSocket(newSocket);
+    const socket = io("http://localhost:5000");
 
-    newSocket.on("warning", (data) => {
-      setWarnings((prevWarnings) => [
-        ...prevWarnings,
-        { id: Date.now(), message: `Source ${data.source}: ${data.message}` },
-      ]);
-    });
-
-    newSocket.on("audio_error", (data) => {
-      setWarnings((prevWarnings) => [
-        ...prevWarnings,
-        { id: Date.now(), message: `Audio Error: ${data.message}` },
-      ]);
-      // Reset playing state for the affected device
-      setActiveDevices(devices => 
-        devices.map(d => 
-          d.id === data.deviceId ? { ...d, isPlaying: false } : d
-        )
+    // Listen for warnings
+    socket.on("warning", (data) => {
+      const sourceId = data.source;
+      
+      // Update device warning states
+      setActiveDevices(prevDevices => 
+        prevDevices.map(device => {
+          if (device.device.index.toString() === sourceId) {
+            // Set warning and create timeout to clear it
+            device.warningTimeout && clearTimeout(device.warningTimeout);
+            const timeoutId = setTimeout(() => {
+              setActiveDevices(devices => 
+                devices.map(d => 
+                  d.id === device.id ? { ...d, hasWarning: false } : d
+                )
+              );
+            }, 5000);
+            
+            return { ...device, hasWarning: true, warningTimeout: timeoutId };
+          }
+          return device;
+        })
       );
     });
 
-    return () => {
-      newSocket.disconnect();
-    };
-  }, []);
-
-  // Fetch available audio devices from the backend
-  useEffect(() => {
-    const fetchAudioDevices = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/audio-devices");
-        const data = await response.json();
-        setAudioDevices(data);
-      } catch (error) {
-        console.error("Error fetching audio devices:", error);
-        setWarnings(prev => [...prev, {
-          id: Date.now(),
-          message: "Failed to fetch audio devices. Please check if the backend server is running."
-        }]);
-      }
-    };
-
-    fetchAudioDevices();
+    return () => socket.disconnect();
   }, []);
 
   const handleDeviceSelect = (event) => {
@@ -83,7 +62,12 @@ const App = () => {
         id: Date.now(),
         device: selectedDevice,
         channel: selectedChannel,
-        isPlaying: false
+        isPlaying: false,
+        stream: null,
+        source: null,
+        gainNode: null,
+        hasWarning: false,
+        warningTimeout: null
       };
       setActiveDevices([...activeDevices, newDevice]);
       setSelectedDevice(null);
@@ -91,32 +75,87 @@ const App = () => {
     }
   };
 
-  const handlePlayPause = (deviceId) => {
-    const device = activeDevices.find(d => d.id === deviceId);
-    if (!device) return;
+  const handlePlayPause = async (deviceId) => {
+    const deviceIndex = activeDevices.findIndex(d => d.id === deviceId);
+    if (deviceIndex === -1) return;
+
+    const device = activeDevices[deviceIndex];
 
     if (device.isPlaying) {
-      // Stop audio capture
-      socket.emit('stop_audio', {
-        deviceId: deviceId,
-        deviceIndex: device.device.index,
-        channel: device.channel
-      });
-    } else {
-      // Start audio capture
-      socket.emit('start_audio', {
-        deviceId: deviceId,
-        deviceIndex: device.device.index,
-        channel: device.channel
-      });
-    }
+      // Stop the stream
+      if (device.stream) {
+        device.stream.getTracks().forEach(track => track.stop());
+      }
+      if (device.source) {
+        device.source.disconnect();
+      }
+      if (device.channelIsolator) {
+        device.channelIsolator.disconnect();
+      }
+      if (device.gainNode) {
+        device.gainNode.disconnect();
+      }
 
-    // Update device state
-    setActiveDevices(devices =>
-      devices.map(d =>
-        d.id === deviceId ? { ...d, isPlaying: !d.isPlaying } : d
-      )
-    );
+      setActiveDevices(devices => devices.map(d =>
+        d.id === deviceId ? {
+          ...d,
+          isPlaying: false,
+          stream: null,
+          source: null,
+          channelIsolator: null,
+          gainNode: null
+        } : d
+      ));
+    } else {
+      try {
+        // Resume audio context if it's suspended
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
+        // Start new stream with high quality settings
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: { exact: device.device.deviceId },
+            channelCount: 2, // Request stereo input
+            autoGainControl: false,
+            echoCancellation: false,
+            noiseSuppression: false,
+            latency: { ideal: 0 },
+            sampleRate: { ideal: 48000 },
+            sampleSize: { ideal: 24 }
+          }
+        });
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const channelIsolator = new AudioWorkletNode(audioContext, 'channel-isolator', {
+          processorOptions: {
+            targetChannel: device.channel
+          }
+        });
+        const gainNode = audioContext.createGain();
+        
+        gainNode.gain.value = 1;
+
+        // Connect the nodes
+        source.connect(channelIsolator);
+        channelIsolator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        setActiveDevices(devices => devices.map(d =>
+          d.id === deviceId ? {
+            ...d,
+            isPlaying: true,
+            stream: stream,
+            source: source,
+            channelIsolator: channelIsolator,
+            gainNode: gainNode
+          } : d
+        ));
+      } catch (error) {
+        console.error("Error accessing microphone:", error);
+      }
+    }
   };
 
   return (
@@ -138,7 +177,7 @@ const App = () => {
         )}
         {selectedDevice && selectedChannel !== null && (
           <button className="add-device-button" onClick={handleAddDevice}>
-            <FaPlus /> Add Device
+            Add Device
           </button>
         )}
       </div>
@@ -147,7 +186,7 @@ const App = () => {
         {activeDevices.map((device) => (
           <button
             key={device.id}
-            className="device-info-button"
+            className={`device-info-button ${device.hasWarning ? 'warning' : ''}`}
             onClick={() => handlePlayPause(device.id)}
           >
             {device.device.name}
@@ -157,18 +196,6 @@ const App = () => {
             <br />
             {device.isPlaying ? "Stop" : "Play"}
           </button>
-        ))}
-      </div>
-
-      <audio id="audio-element" controls style={{ display: "none" }} />
-
-      <div className="warning-container">
-        {warnings.map((warning) => (
-          <WarningPopUp
-            key={warning.id}
-            warning={warning}
-            onClose={(id) => setWarnings(warnings.filter((w) => w.id !== id))}
-          />
         ))}
       </div>
     </div>
