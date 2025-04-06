@@ -11,7 +11,10 @@ import random
 RATE = 16000  # New Sample rate (Hz) - MUST MATCH audio_handler.py
 BUFFER_DURATION_SECONDS = 2  # New Duration to buffer audio before processing (seconds)
 TARGET_SAMPLES = int(BUFFER_DURATION_SECONDS * RATE)
-ml_model = load('ML_MODEL/audio_popping_classifier_model.joblib') #Load ML model
+N_FFT = 2048  # FFT window size for feature extraction
+HOP_LENGTH = 512  # Hop length for feature extraction
+MODEL_PATH = 'ML_MODEL/models/audio_popping_classifier_model_normalised.joblib'  # Path to ML model
+ml_model = load(MODEL_PATH)  # Load ML model
 
 # Ensure the temporary directory exists
 TEMP_FEATURE_DIR = os.path.join(os.path.dirname(__file__), '..', 'temp', 'ml_features')
@@ -32,29 +35,25 @@ def extract_features_from_chunk(audio_chunk, sr):
                     Returns None if an error occurs or the chunk is too short.
     """
     try:
-        # Define consistent analysis parameters
-        n_fft = 2048
-        hop_length = 512 # Default hop_length for many librosa features
-
         # Check if audio chunk is long enough for FFT
-        if len(audio_chunk) < n_fft:
-            print(f"Warning: Audio chunk length ({len(audio_chunk)}) is shorter than n_fft ({n_fft}). Skipping feature extraction.")
+        if len(audio_chunk) < N_FFT:
+            print(f"Warning: Audio chunk length ({len(audio_chunk)}) is shorter than N_FFT ({N_FFT}). Skipping feature extraction.")
             return None
 
         # 1. RMS Energy (returns shape (1, n_frames), get [0] for 1D)
-        rms = librosa.feature.rms(y=audio_chunk, frame_length=n_fft, hop_length=hop_length)[0]
+        rms = librosa.feature.rms(y=audio_chunk, frame_length=N_FFT, hop_length=HOP_LENGTH)[0]
 
         # 2. Zero-Crossing Rate (returns shape (1, n_frames), get [0] for 1D)
-        zcr = librosa.feature.zero_crossing_rate(y=audio_chunk, frame_length=n_fft, hop_length=hop_length)[0]
+        zcr = librosa.feature.zero_crossing_rate(y=audio_chunk, frame_length=N_FFT, hop_length=HOP_LENGTH)[0]
 
         # 3. Onset Strength (returns 1D array)
-        onset_strength = librosa.onset.onset_strength(y=audio_chunk, sr=sr, hop_length=hop_length)
+        onset_strength = librosa.onset.onset_strength(y=audio_chunk, sr=sr, hop_length=HOP_LENGTH)
 
         # 4. Spectral Centroid (returns shape (1, n_frames), get [0] for 1D)
-        spectral_centroid = librosa.feature.spectral_centroid(y=audio_chunk, sr=sr, n_fft=n_fft, hop_length=hop_length)[0]
+        spectral_centroid = librosa.feature.spectral_centroid(y=audio_chunk, sr=sr, n_fft=N_FFT, hop_length=HOP_LENGTH)[0]
 
         # 5. Spectral Flatness (returns shape (1, n_frames), get [0] for 1D)
-        spectral_flatness = librosa.feature.spectral_flatness(y=audio_chunk, n_fft=n_fft, hop_length=hop_length)[0]
+        spectral_flatness = librosa.feature.spectral_flatness(y=audio_chunk, n_fft=N_FFT, hop_length=HOP_LENGTH)[0]
 
         # Ensure all features have the same number of frames (columns)
         # Use the length of RMS as the target, as it's usually consistent
@@ -185,9 +184,15 @@ def buffer_and_analyze_audio(source_id, ml_input_queue, ml_output_queue, warning
                 if features is not None and features.shape[0] > 0:
                     # --- Placeholder: Interact with the actual ML model ---
                     prediction = ml_model.predict(features) # Example
-                    if np.any(prediction == 1):
+                    
+                    # Count consecutive positive predictions
+                    # Using 3 consecutive frames as threshold
+                    consecutive_pops = sum(1 for i in range(len(prediction)-2) 
+                                        if prediction[i:i+3].all())
+                    
+                    if consecutive_pops > 0:  # If we find any sequence of 3+ consecutive pop frames
                         warning_message = "popping detected"
-                        print(f"ML Interface [{source_id}]: Detected '{warning_message}'")
+                        print(f"ML Interface [{source_id}]: Detected '{warning_message}' - {consecutive_pops} sequences")
                         if not warning_queue.full():
                             warning_queue.put((source_id, warning_message))
                 else:

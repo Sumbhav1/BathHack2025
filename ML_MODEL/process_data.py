@@ -4,9 +4,9 @@ import os
 import argparse
 
 # Constants
-RATE = 44100  # Target sample rate for loading audio
-FRAME_SIZE = 1024  # Frame size (e.g., 1024 samples)
-HOP_SIZE = 512  # Hop size (e.g., 50% overlap)
+RATE = 16000  # Match sample rate with ml_interface.py
+n_fft = 2048  # Match FFT size with ml_interface.py
+hop_length = 512  # Consistent hop length
 
 def extract_features_from_file(audio_path):
     """Loads an audio file, extracts frame-level features, and returns the feature matrix."""
@@ -18,15 +18,31 @@ def extract_features_from_file(audio_path):
             print(f"Warning: Audio file '{audio_path}' is empty or could not be loaded properly.")
             return None
 
-        # Extract features for each frame
-        rms = librosa.feature.rms(y=audio_data, frame_length=FRAME_SIZE, hop_length=HOP_SIZE)[0]
-        zcr = librosa.feature.zero_crossing_rate(audio_data, frame_length=FRAME_SIZE, hop_length=HOP_SIZE)[0]
-        onset_env = librosa.onset.onset_strength(y=audio_data, sr=RATE, hop_length=HOP_SIZE)
+        # Normalize audio (peak normalization)
+        peak_value = np.max(np.abs(audio_data))
+        if peak_value > 1e-6:  # Avoid division by zero or near-zero
+            audio_data = audio_data / peak_value
 
-        spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sr, hop_length=HOP_SIZE)[0]
-        spectral_flatness = librosa.feature.spectral_flatness(y=audio_data, hop_length=HOP_SIZE)[0]
+        # Check if audio is long enough for FFT
+        if len(audio_data) < n_fft:
+            print(f"Warning: Audio length ({len(audio_data)}) is shorter than n_fft ({n_fft})")
+            return None
 
-        # Combine all features into one matrix (shape: [num_frames, num_features])
+        # Extract features using consistent parameters
+        rms = librosa.feature.rms(y=audio_data, frame_length=n_fft, hop_length=hop_length)[0]
+        zcr = librosa.feature.zero_crossing_rate(y=audio_data, frame_length=n_fft, hop_length=hop_length)[0]
+        onset_env = librosa.onset.onset_strength(y=audio_data, sr=RATE, hop_length=hop_length)
+        spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sr, n_fft=n_fft, hop_length=hop_length)[0]
+        spectral_flatness = librosa.feature.spectral_flatness(y=audio_data, n_fft=n_fft, hop_length=hop_length)[0]
+
+        # Ensure all features have the same number of frames using rms as reference
+        target_frames = rms.shape[0]
+        onset_env = np.resize(onset_env, target_frames)
+        spectral_centroid = np.resize(spectral_centroid, target_frames)
+        spectral_flatness = np.resize(spectral_flatness, target_frames)
+        zcr = np.resize(zcr, target_frames)
+
+        # Stack features and transpose to match ml_interface.py output shape (num_frames, 5)
         feature_matrix = np.vstack([rms, zcr, onset_env, spectral_centroid, spectral_flatness]).T
         print(f"Extracted feature matrix shape: {feature_matrix.shape}")
 

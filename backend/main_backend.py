@@ -11,7 +11,7 @@ from ml_interface import buffer_and_analyze_audio, RATE # Import RATE from ml_in
 # Define the audio sources to capture (device_index, target_channel)
 # Replace with dynamic selection logic later if needed
 TARGET_SOURCES = [
-    (0, 2), # Example: Device 1, Channel 0 - ADJUST THIS TO YOUR SYSTEM
+    (1, 1), # Example: Device 1, Channel 0 - ADJUST THIS TO YOUR SYSTEM
     # Add more sources as needed, e.g.:
     # (1, 1), # Device 1, Channel 1
     # (3, 0), # Device 3, Channel 0
