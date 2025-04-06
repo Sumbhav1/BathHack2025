@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import DeviceSelector from "./components/DeviceSelector";
 import ChannelSelector from "./components/ChannelSelector";
@@ -9,37 +9,91 @@ const App = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [activeDevices, setActiveDevices] = useState([]);
+  const [audioContext] = useState(() => new (window.AudioContext || window.webkitAudioContext)());
+  const [workletLoaded, setWorkletLoaded] = useState(false);
+  const socketRef = useRef(null);
+
+  // Load audio worklet when component mounts
+  useEffect(() => {
+    const loadWorklet = async () => {
+      if (!workletLoaded) {
+        try {
+          await audioContext.audioWorklet.addModule('/channelIsolatorWorklet.js');
+          setWorkletLoaded(true);
+          console.log('Channel isolator worklet loaded successfully');
+        } catch (error) {
+          console.error('Failed to load audio worklet:', error);
+        }
+      }
+    };
+    loadWorklet();
+  }, [audioContext, workletLoaded]);
+
+  // Fetch audio devices when component mounts
+  useEffect(() => {
+    const fetchAudioDevices = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/audio-devices");
+        if (!response.ok) {
+          throw new Error('Failed to fetch audio devices');
+        }
+        const devices = await response.json();
+        setAudioDevices(devices);
+      } catch (error) {
+        console.error("Error fetching audio devices:", error);
+      }
+    };
+
+    fetchAudioDevices();
+  }, []);
 
   // Connect to websocket server
   useEffect(() => {
     const socket = io("http://localhost:5000");
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("Connected to server");
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Disconnected from server");
+    });
 
     // Listen for warnings
     socket.on("warning", (data) => {
-      const sourceId = data.source;
+      console.log("Received warning:", data);
+      console.log("Active devices:", activeDevices);
       
-      // Update device warning states
-      setActiveDevices(prevDevices => 
-        prevDevices.map(device => {
-          if (device.device.index.toString() === sourceId) {
-            // Set warning and create timeout to clear it
-            device.warningTimeout && clearTimeout(device.warningTimeout);
-            const timeoutId = setTimeout(() => {
-              setActiveDevices(devices => 
-                devices.map(d => 
-                  d.id === device.id ? { ...d, hasWarning: false } : d
-                )
-              );
-            }, 5000);
-            
-            return { ...device, hasWarning: true, warningTimeout: timeoutId };
-          }
-          return device;
-        })
-      );
+      const sourceId = data.source;
+      console.log("Looking for device with index:", sourceId);
+      
+      setActiveDevices(prevDevices => {
+          const updatedDevices = prevDevices.map(device => {
+              console.log("Checking device:", device.device.index, "against source:", sourceId);
+              if (device.device.index.toString() === sourceId) {
+                  console.log("Match found! Setting warning for device:", device.id);
+                  // Set warning...
+                  return { ...device, hasWarning: true };
+              }
+              return device;
+          });
+          console.log("Updated devices:", updatedDevices);
+          return updatedDevices;
+      });
     });
 
-    return () => socket.disconnect();
+    return () => {
+      // Clean up any monitored devices when component unmounts
+      activeDevices.forEach(device => {
+        socket.emit('stop_audio', {
+          deviceId: device.id,
+          deviceIndex: device.device.index,
+          channel: device.channel
+        });
+      });
+      socket.disconnect();
+    };
   }, []);
 
   const handleDeviceSelect = (event) => {
@@ -58,8 +112,9 @@ const App = () => {
 
   const handleAddDevice = () => {
     if (selectedDevice && selectedChannel !== null) {
+      const deviceId = Date.now().toString();
       const newDevice = {
-        id: Date.now(),
+        id: deviceId,
         device: selectedDevice,
         channel: selectedChannel,
         isPlaying: false,
@@ -69,7 +124,16 @@ const App = () => {
         hasWarning: false,
         warningTimeout: null
       };
-      setActiveDevices([...activeDevices, newDevice]);
+
+      // Start backend monitoring immediately
+      socketRef.current.emit('start_audio', {
+        deviceId: deviceId,
+        deviceIndex: selectedDevice.index,
+        channel: selectedChannel
+      });
+
+      // Add device to frontend state
+      setActiveDevices(prev => [...prev, newDevice]);
       setSelectedDevice(null);
       setSelectedChannel(null);
     }
@@ -82,19 +146,11 @@ const App = () => {
     const device = activeDevices[deviceIndex];
 
     if (device.isPlaying) {
-      // Stop the stream
-      if (device.stream) {
-        device.stream.getTracks().forEach(track => track.stop());
-      }
-      if (device.source) {
-        device.source.disconnect();
-      }
-      if (device.channelIsolator) {
-        device.channelIsolator.disconnect();
-      }
-      if (device.gainNode) {
-        device.gainNode.disconnect();
-      }
+      // Only stop frontend audio playback
+      device.stream?.getTracks().forEach(track => track.stop());
+      device.source?.disconnect();
+      device.channelIsolator?.disconnect();
+      device.gainNode?.disconnect();
 
       setActiveDevices(devices => devices.map(d =>
         d.id === deviceId ? {
@@ -107,26 +163,29 @@ const App = () => {
         } : d
       ));
     } else {
+      if (!workletLoaded) {
+        console.error('Audio worklet not loaded yet');
+        return;
+      }
+
       try {
-        // Resume audio context if it's suspended
+        // Resume audio context if suspended
         if (audioContext.state === 'suspended') {
           await audioContext.resume();
         }
 
-        // Start new stream with high quality settings
+        // Get audio input stream
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             deviceId: { exact: device.device.deviceId },
-            channelCount: 2, // Request stereo input
+            channelCount: { ideal: device.device.channels },
             autoGainControl: false,
             echoCancellation: false,
-            noiseSuppression: false,
-            latency: { ideal: 0 },
-            sampleRate: { ideal: 48000 },
-            sampleSize: { ideal: 24 }
+            noiseSuppression: false
           }
         });
 
+        // Create audio nodes
         const source = audioContext.createMediaStreamSource(stream);
         const channelIsolator = new AudioWorkletNode(audioContext, 'channel-isolator', {
           processorOptions: {
@@ -134,27 +193,50 @@ const App = () => {
           }
         });
         const gainNode = audioContext.createGain();
-        
         gainNode.gain.value = 1;
 
-        // Connect the nodes
+        // Connect nodes
         source.connect(channelIsolator);
         channelIsolator.connect(gainNode);
         gainNode.connect(audioContext.destination);
 
+        // Update state
         setActiveDevices(devices => devices.map(d =>
           d.id === deviceId ? {
             ...d,
             isPlaying: true,
-            stream: stream,
-            source: source,
-            channelIsolator: channelIsolator,
-            gainNode: gainNode
+            stream,
+            source,
+            channelIsolator,
+            gainNode
           } : d
         ));
       } catch (error) {
-        console.error("Error accessing microphone:", error);
+        console.error('Error starting audio capture:', error);
       }
+    }
+  };
+
+  const handleRemoveDevice = (deviceId) => {
+    const device = activeDevices.find(d => d.id === deviceId);
+    if (device) {
+      // Stop any playback
+      if (device.isPlaying) {
+        device.stream?.getTracks().forEach(track => track.stop());
+        device.source?.disconnect();
+        device.channelIsolator?.disconnect();
+        device.gainNode?.disconnect();
+      }
+
+      // Stop backend monitoring
+      socketRef.current.emit('stop_audio', {
+        deviceId: device.id,
+        deviceIndex: device.device.index,
+        channel: device.channel
+      });
+
+      // Remove from state
+      setActiveDevices(devices => devices.filter(d => d.id !== deviceId));
     }
   };
 
@@ -184,18 +266,25 @@ const App = () => {
 
       <div className="device-info-container">
         {activeDevices.map((device) => (
-          <button
-            key={device.id}
-            className={`device-info-button ${device.hasWarning ? 'warning' : ''}`}
-            onClick={() => handlePlayPause(device.id)}
-          >
-            {device.device.name}
-            <br />
-            Channel {device.channel + 1}
-            <br />
-            <br />
-            {device.isPlaying ? "Stop" : "Play"}
-          </button>
+          <div key={device.id} className="device-button-container">
+            <button
+              className={`device-info-button ${device.hasWarning ? 'warning' : ''}`}
+              onClick={() => handlePlayPause(device.id)}
+            >
+              {device.device.name}
+              <br />
+              Channel {device.channel + 1}
+              <br />
+              <br />
+              {device.isPlaying ? "Stop" : "Play"}
+            </button>
+            <button 
+              className="remove-device-button"
+              onClick={() => handleRemoveDevice(device.id)}
+            >
+              ✕
+            </button>
+          </div>
         ))}
       </div>
     </div>
