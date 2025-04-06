@@ -1,0 +1,51 @@
+/* components/WarningPopUp.css */
+.warning-popup {
+    background-color: #ff6347; /* Tomato color for warning */
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    opacity: 0.9;
+    font-size: 16px;
+    margin-right: 15px;
+    max-width: 200px;
+    height: 120px; /* Taller, square-like shape */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-direction: column;
+    animation: fadeIn 0.5s ease, fadeOut 0.5s 4.5s forwards;
+  }
+  
+  .warning-popup span {
+    text-align: center;
+    font-weight: bold;
+    padding: 5px;
+    word-wrap: break-word;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+  
+  
+  

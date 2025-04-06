@@ -6,7 +6,7 @@ from queue import Queue, Empty, Full # Use Empty for non-blocking gets
 # Import components from other modules
 from audio_handler import AudioCapture, list_audio_devices
 from ml_interface import buffer_and_analyze_audio, RATE # Import RATE from ml_interface if needed
-
+warning_queue = Queue(maxsize=200)  # Create a Queue instance
 # --- Configuration ---
 # Define the audio sources to capture (device_index, target_channel)
 # Replace with dynamic selection logic later if needed
@@ -53,8 +53,6 @@ def main():
         return
 
     # 2. Create Shared Resources
-    print("\nCreating shared warning queue and stop event...")
-    warning_queue = Queue(maxsize=200) # Shared queue for warnings from all ML threads
     stop_event = threading.Event() # Shared signal for graceful shutdown
 
     # 3. Setup Resources and Threads for Each Source
