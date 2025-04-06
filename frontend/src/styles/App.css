@@ -52,7 +52,7 @@ body {
   margin: 0;
   display: inline-flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-end; /* Align items to bottom */
   gap: 16px;
   background-color: var(--bg-tertiary);
   border-radius: 12px;
@@ -214,9 +214,9 @@ body {
 }
 
 .add-device-button {
-  margin-top: 0; /* Remove top margin since we're horizontal now */
-  height: 36px; /* Match the height of the dropdowns */
-  padding: 10px 20px; /* Adjust horizontal padding only */
+  margin: 0;
+  height: 36px;
+  padding: 10px 20px;
   background-color: var(--accent-primary);
   color: white;
   border: none;
@@ -227,8 +227,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  align-self: flex-end; /* Align with the bottom of the dropdowns */
-  margin-bottom: 2px; /* Slight adjustment to align with dropdowns */
+  align-self: flex-end;
+  margin-top: auto; /* Push button to bottom of container */
   transition: all var(--transition-speed);
 }
 
@@ -337,6 +337,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: 0; /* Remove any bottom margin */
 }
 
 .custom-name-input label {
@@ -356,6 +357,7 @@ body {
   min-width: 200px;
   box-sizing: border-box;
   transition: all var(--transition-speed);
+  margin-bottom: 0; /* Ensure no bottom margin */
 }
 
 .custom-name-input input:hover {
