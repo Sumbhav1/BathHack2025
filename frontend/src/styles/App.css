@@ -1,3 +1,23 @@
+:root {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3d3d3d;
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --accent-primary: #00a8ff;
+  --accent-secondary: #0097e6;
+  --warning-color: #ff4757;
+  --success-color: #2ed573;
+  --transition-speed: 0.3s;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
 /* App.css */
 .app {
   font-family: Arial, sans-serif;
@@ -6,19 +26,26 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  background-color: white;
+  background-color: var(--bg-primary);
+  min-height: 100vh;
 }
 
 .ribbon-container {
-  background-color: #f4f4f4;
+  background-color: var(--bg-secondary);
   width: 100%;
   padding: 20px;
   box-sizing: border-box;
+  border-bottom: 1px solid var(--bg-tertiary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .app h1 {
-  margin: 0 0 15px 0;
+  margin: 0 0 20px 0;
   padding: 0;
+  color: var(--text-primary);
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.5px;
 }
 
 .device-selection {
@@ -26,11 +53,12 @@
   display: inline-flex;
   flex-direction: row;
   align-items: center;
-  gap: 15px;
-  background-color: #e8e8e8;
+  gap: 16px;
+  background-color: var(--bg-tertiary);
   border-radius: 12px;
-  padding: 12px;
+  padding: 16px;
   width: auto;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .device-selector {
@@ -47,20 +75,37 @@
 
 .device-selector label {
   font-weight: bold;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   margin: 0; /* Remove margin from labels */
-  font-size: 14px;
+  font-size: 0.9rem;
   line-height: 1;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .device-selector select {
   width: 100%;
-  padding: 8px;
-  font-size: 14px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
+  padding: 10px 15px;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--bg-tertiary);
   margin: 0; /* Remove any margins */
   height: 36px; /* Set consistent height */
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: all var(--transition-speed);
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.device-selector select:hover {
+  border-color: var(--accent-primary);
+}
+
+.device-selector select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(0, 168, 255, 0.2);
 }
 
 .device-details {
@@ -81,105 +126,245 @@
 }
 
 .device-info-container {
-  padding: 20px 40px;
+  padding: 30px;
   display: flex;
-  gap: 25px; /* Slightly reduced gap from 30px */
   flex-wrap: wrap;
+  gap: 25px;
   width: 100%;
   box-sizing: border-box;
-  justify-content: flex-start; /* Ensure left alignment */
-  align-items: flex-start;
-  max-width: none; /* Remove max-width to allow full width */
-  margin: 0; /* Remove auto margins */
+  justify-content: flex-start;
 }
 
 .device-info-button {
-  position: relative;  /* Ensure this is set for absolute positioning of child */
-  bottom: auto;       /* Remove fixed positioning */
-  left: auto;        /* Remove fixed positioning */
-  width: 245px;  /* Reduced from 250px to fit 5 in a row */
-  height: 245px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px; /* Reduce from 8px to 4px for a more square look */
-  padding: 15px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  font-size: 17px; /* Adjusted for the new size */
-  cursor: pointer;
-  transition: all 0.3s ease;
-  flex-shrink: 0;  /* Prevent shrinking */
-  margin-bottom: 20px; /* Add space between rows when they wrap */
-}
-
-.device-info-button.warning {
-  background-color: #f44336;
+  width: 235px;
+  height: 235px;
+  margin: 0;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--bg-tertiary);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all var(--transition-speed);
 }
 
 .device-info-button:hover {
-  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+  border-color: var(--accent-primary);
 }
 
-.device-info-button.warning:hover {
-  background-color: #d32f2f;
+.device-info-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.device-info-button.warning {
+  background-color: var(--warning-color);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 71, 87, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 71, 87, 0);
+  }
 }
 
 /* Add styles for the button container to maintain consistent spacing */
 .device-button-container {
-  position: relative; /* For proper positioning context */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0; /* Remove margin since we're using gap */
-  width: 235px; /* Match the new button width */
+  position: relative;
+  width: 235px;
+}
+
+.device-button-container:hover .remove-device-button {
+  opacity: 1;
 }
 
 .remove-device-button {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 15px;
+  right: 15px;
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background-color: rgba(0, 0, 0, 0.2);
-  color: white;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  z-index: 1;
-  padding: 0;
-  transition: background-color 0.3s ease;
+  transition: all var(--transition-speed);
+  opacity: 0;
+  z-index: 2;
+}
+
+.device-info-button:hover .remove-device-button {
+  opacity: 1;
 }
 
 .remove-device-button:hover {
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--warning-color);
+  color: white;
+  transform: scale(1.1);
 }
 
 .add-device-button {
   margin-top: 0; /* Remove top margin since we're horizontal now */
   height: 36px; /* Match the height of the dropdowns */
-  padding: 0 16px; /* Adjust horizontal padding only */
-  background-color: #2196F3;
+  padding: 10px 20px; /* Adjust horizontal padding only */
+  background-color: var(--accent-primary);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 0.9rem;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 8px;
   align-self: flex-end; /* Align with the bottom of the dropdowns */
   margin-bottom: 2px; /* Slight adjustment to align with dropdowns */
+  transition: all var(--transition-speed);
 }
 
 .add-device-button:hover {
-  background-color: #1976D2;
+  background-color: var(--accent-secondary);
+  transform: translateY(-1px);
+}
+
+.device-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px 20px;
+}
+
+.device-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  text-align: left;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 10px;
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+  transition: all var(--transition-speed);
+  flex-shrink: 0;
+}
+
+.status-indicator.active {
+  background-color: var(--success-color);
+  box-shadow: 0 0 10px var(--success-color);
+}
+
+.device-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.channel-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.channel-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.channel-number {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.playback-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-text {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.action-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.warning-indicator {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.warning-icon {
+  font-size: 1.5rem;
+}
+
+.warning-text {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.custom-name-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-name-input label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.custom-name-input input {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-tertiary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  height: 36px;
+  min-width: 200px;
+  box-sizing: border-box;
+  transition: all var(--transition-speed);
+}
+
+.custom-name-input input:hover {
+  border-color: var(--accent-primary);
+}
+
+.custom-name-input input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(0, 168, 255, 0.2);
 }
 

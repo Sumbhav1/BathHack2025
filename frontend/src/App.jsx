@@ -13,6 +13,7 @@ const App = () => {
   const [audioContext] = useState(() => new (window.AudioContext || window.webkitAudioContext)());
   const [workletLoaded, setWorkletLoaded] = useState(false);
   const socketRef = useRef(null);
+  const [customName, setCustomName] = useState("");
 
   // Keep the ref updated with the latest activeDevices
   useEffect(() => {
@@ -155,6 +156,7 @@ const App = () => {
         id: deviceId,
         device: selectedDevice,
         channel: selectedChannel,
+        customName: customName || selectedDevice.name, // Use custom name if provided
         isPlaying: false,
         stream: null,
         source: null,
@@ -174,6 +176,7 @@ const App = () => {
       setActiveDevices(prev => [...prev, newDevice]);
       setSelectedDevice(null);
       setSelectedChannel(null);
+      setCustomName(""); // Reset custom name after adding device
     }
   };
 
@@ -295,6 +298,18 @@ const App = () => {
               onChannelSelect={handleChannelSelect}
             />
           )}
+          {selectedDevice && (
+            <div className="custom-name-input">
+              <label htmlFor="custom-name">Custom Name</label>
+              <input
+                id="custom-name"
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder={selectedDevice ? selectedDevice.name : ""}
+              />
+            </div>
+          )}
           {selectedDevice && Number.isInteger(selectedChannel) && selectedChannel >= 0 && (
             <button className="add-device-button" onClick={handleAddDevice}>
               Add Device
@@ -310,16 +325,34 @@ const App = () => {
               className={`device-info-button ${device.hasWarning ? 'warning' : ''}`}
               onClick={() => handlePlayPause(device.id)}
             >
-              {device.device.name}
-              <br />
-              Channel {device.channel + 1}
-              <br />
-              <br />
-              {device.isPlaying ? "Stop" : "Play"}
+              <div className="device-header">
+                <div className={`status-indicator ${device.isPlaying ? 'active' : ''}`}></div>
+                <span className="device-name">{device.customName}</span>
+              </div>
+              
+              <div className="device-content">
+                <div className="channel-info">
+                  <span className="channel-label">Channel</span>
+                  <span className="channel-number">{device.channel + 1}</span>
+                </div>
+                
+                <div className="playback-status">
+                  <span className="status-text">{device.isPlaying ? "Monitoring" : "Idle"}</span>
+                  <span className="action-text">{device.isPlaying ? "Click to Stop" : "Click to Monitor"}</span>
+                </div>
+              </div>
+
+              {device.hasWarning && (
+                <div className="warning-indicator">
+                  <span className="warning-icon">⚠️</span>
+                  <span className="warning-text">Audio Issue Detected</span>
+                </div>
+              )}
             </button>
             <button 
               className="remove-device-button"
               onClick={() => handleRemoveDevice(device.id)}
+              title="Remove Device"
             >
               ✕
             </button>
