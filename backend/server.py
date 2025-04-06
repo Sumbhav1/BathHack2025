@@ -7,6 +7,7 @@ from queue import Queue
 from audio_handler import AudioCapture, list_audio_devices
 from ml_interface import buffer_and_analyze_audio
 from main_backend import warning_queue
+import traceback
 
 app = Flask(__name__)
 CORS(app)
@@ -30,31 +31,35 @@ def warning_emitter():
     while not warning_thread_stop.is_set():
         if not warning_queue.empty():
             try:
-                source_id, message = warning_queue.get_nowait()
+                source_id, message = warning_queue.get_nowait() # source_id is (device_index, channel)
                 print(f"Warning Data:")
-                print(f"- Source ID: {source_id}, Type: {type(source_id)}")
+                print(f"- Source ID Tuple: {source_id}, Type: {type(source_id)}")
                 print(f"- Message: {message}")
                 print(f"- Active Devices: {active_devices}")
-                
-                # Handle tuple source_id
-                device_index = source_id[0] if isinstance(source_id, tuple) else source_id
-                source_id_str = str(device_index)
-                
-                print(f"- Converted Source ID: {source_id_str}")
-                
-                if active_devices:
-                    print(f"Emitting warning for source {source_id_str}")
-                    socketio.emit("warning", {
-                        "source": source_id_str,
-                        "message": message
-                    })
+
+                # Ensure source_id is a tuple with two elements
+                if isinstance(source_id, tuple) and len(source_id) == 2:
+                    device_index, channel = source_id # Unpack the tuple
+                    print(f"- Device Index: {device_index}, Channel: {channel}")
+
+                    if active_devices:
+                        print(f"Emitting warning for source (Index: {device_index}, Channel: {channel})")
+                        # Emit both index and channel in the payload
+                        socketio.emit("warning", {
+                            "deviceIndex": str(device_index), # Keep index as string for consistency
+                            "channel": channel,             # Send channel as its original type (likely int)
+                            "message": message
+                        })
+                    else:
+                        print("No active devices registered")
                 else:
-                    print("No active devices registered")
+                    # Log if the source_id format is unexpected
+                    print(f"Warning emitter: Received unexpected source_id format: {source_id}")
+
             except Exception as e:
                 print(f"Error in warning emitter: {e}")
-                import traceback
-                traceback.print_exc()
-        socketio.sleep(0.1)
+                traceback.print_exc() # Use traceback for detailed error logging
+        socketio.sleep(0.1) # Use socketio sleep for cooperative multitasking
     print("Warning emitter stopping...")
 
 def start_monitoring_device(device_id, device_index, channel):

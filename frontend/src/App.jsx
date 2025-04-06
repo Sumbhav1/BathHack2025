@@ -60,41 +60,68 @@ const App = () => {
       console.log("Disconnected from server");
     });
 
-    // Listen for warnings
+    // --- MODIFIED WARNING HANDLER ---
     socket.on("warning", (data) => {
       console.log("Received warning:", data);
-      console.log("Active devices:", activeDevices);
-      
-      const sourceId = data.source;
-      console.log("Looking for device with index:", sourceId);
-      
+      const { deviceIndex, channel, message } = data; // Destructure new payload
+
+      // Ensure we have the necessary data
+      if (deviceIndex === undefined || channel === undefined) {
+        console.error("Warning data missing deviceIndex or channel:", data);
+        return;
+      }
+
       setActiveDevices(prevDevices => {
-          const updatedDevices = prevDevices.map(device => {
-              console.log("Checking device:", device.device.index, "against source:", sourceId);
-              if (device.device.index.toString() === sourceId) {
-                  console.log("Match found! Setting warning for device:", device.id);
-                  // Set warning...
-                  return { ...device, hasWarning: true };
-              }
-              return device;
-          });
-          console.log("Updated devices:", updatedDevices);
-          return updatedDevices;
+        let warningSet = false; // Flag to check if we found the device
+        const updatedDevices = prevDevices.map(device => {
+          // Match based on both device index and channel
+          if (device.device.index.toString() === deviceIndex && device.channel === channel) {
+            console.log(`Match found! Setting warning for device ID: ${device.id} (Index: ${deviceIndex}, Channel: ${channel})`);
+            warningSet = true;
+            // Clear any existing timeout before setting a new one
+            if (device.warningTimeout) {
+              clearTimeout(device.warningTimeout);
+            }
+            // Set a timeout to clear this specific warning after 5 seconds
+            const timeoutId = setTimeout(() => {
+              console.log(`Clearing warning for device ID: ${device.id}`);
+              setActiveDevices(currentDevices =>
+                currentDevices.map(d =>
+                  d.id === device.id ? { ...d, hasWarning: false, warningTimeout: null } : d
+                )
+              );
+            }, 5000); // 5 seconds
+            return { ...device, hasWarning: true, warningTimeout: timeoutId };
+          }
+          return device; // Return unchanged device if no match
+        });
+
+        if (!warningSet) {
+          console.log(`Warning received for inactive/unknown device (Index: ${deviceIndex}, Channel: ${channel})`);
+        }
+        return updatedDevices; // Return the potentially updated list
       });
     });
+    // --- END MODIFIED WARNING HANDLER ---
 
     return () => {
       // Clean up any monitored devices when component unmounts
       activeDevices.forEach(device => {
+        // Clear any pending warning timeouts
+        if (device.warningTimeout) {
+          clearTimeout(device.warningTimeout);
+        }
+        // Stop backend monitoring
         socket.emit('stop_audio', {
           deviceId: device.id,
-          deviceIndex: device.device.index,
-          channel: device.channel
+          // Ensure deviceIndex and channel are sent if needed by backend on stop
+          // deviceIndex: device.device.index,
+          // channel: device.channel
         });
       });
       socket.disconnect();
     };
-  }, []);
+  }, [activeDevices]); // Add activeDevices as dependency to ensure cleanup uses the latest list
 
   const handleDeviceSelect = (event) => {
     const deviceIndex = parseInt(event.target.value, 10);
