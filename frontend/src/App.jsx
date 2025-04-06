@@ -143,8 +143,9 @@ const App = () => {
   };
 
   const handleChannelSelect = (event) => {
-    const channelIndex = parseInt(event.target.value, 10);
-    setSelectedChannel(channelIndex);
+    const value = event.target.value;
+    // Set to null if empty string (no selection), otherwise parse as integer
+    setSelectedChannel(value === "" ? null : parseInt(value, 10));
   };
 
   const handleAddDevice = () => {
@@ -279,26 +280,27 @@ const App = () => {
 
   return (
     <div className="app">
-      <h1>Audio Device Hub</h1>
-
-      <div className="device-selection">
-        <DeviceSelector
-          devices={audioDevices}
-          selectedDevice={selectedDevice}
-          onDeviceSelect={handleDeviceSelect}
-        />
-        {selectedDevice && (
-          <ChannelSelector
-            channels={selectedDevice.channels}
-            selectedChannel={selectedChannel}
-            onChannelSelect={handleChannelSelect}
+      <div className="ribbon-container">
+        <h1>Audio Device Hub</h1>
+        <div className="device-selection">
+          <DeviceSelector
+            devices={audioDevices}
+            selectedDevice={selectedDevice}
+            onDeviceSelect={handleDeviceSelect}
           />
-        )}
-        {selectedDevice && selectedChannel !== null && (
-          <button className="add-device-button" onClick={handleAddDevice}>
-            Add Device
-          </button>
-        )}
+          {selectedDevice && (
+            <ChannelSelector
+              channels={selectedDevice.channels}
+              selectedChannel={selectedChannel}
+              onChannelSelect={handleChannelSelect}
+            />
+          )}
+          {selectedDevice && Number.isInteger(selectedChannel) && selectedChannel >= 0 && (
+            <button className="add-device-button" onClick={handleAddDevice}>
+              Add Device
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="device-info-container">

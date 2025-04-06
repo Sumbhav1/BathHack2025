@@ -1,113 +1,185 @@
 /* App.css */
 .app {
-    font-family: Arial, sans-serif;
-    padding: 20px;
-    background-color: #f4f4f4;
-    max-width: 500px;
-    margin: 0 auto;
-  }
-  
-  .device-selection {
-    margin-bottom: 20px;
-  }
-  
-  .device-selector {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-  
-  .device-selector label {
-    font-weight: bold;
-    margin-bottom: 5px;
-  }
-  
-  .device-selector select {
-    padding: 10px;
-    font-size: 16px;
-    border-radius: 8px;
-    border: 2px solid #ccc;
-    width: 100%;
-  }
-  
-  .device-details {
-    margin-top: 20px;
-  }
-  
-  .warning-container {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-start;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 15px;
-    z-index: 1000;
-  }
+  font-family: Arial, sans-serif;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background-color: white;
+}
 
-  .device-info-container {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    right: 20px;
-    display: flex;
-    gap: 20px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 10px;
-  }
+.ribbon-container {
+  background-color: #f4f4f4;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
 
-  .device-info-button {
-    position: relative;  /* Change from fixed to relative */
-    bottom: auto;       /* Remove fixed positioning */
-    left: auto;        /* Remove fixed positioning */
-    min-width: 120px;  /* Change width to min-width */
-    height: 120px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    flex-shrink: 0;  /* Prevent shrinking */
-  }
+.app h1 {
+  margin: 0 0 15px 0;
+  padding: 0;
+}
 
-  .device-info-button.warning {
-    background-color: #f44336;
-  }
+.device-selection {
+  margin: 0;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 15px;
+  background-color: #e8e8e8;
+  border-radius: 12px;
+  padding: 12px;
+  width: auto;
+}
 
-  .device-info-button:hover {
-    background-color: #45a049;
-  }
+.device-selector {
+  flex: 1;
+  min-width: 200px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  margin: 0; /* Remove any margins */
+}
 
-  .device-info-button.warning:hover {
-    background-color: #d32f2f;
-  }
+.device-selector label {
+  font-weight: bold;
+  margin-bottom: 5px;
+  margin: 0; /* Remove margin from labels */
+  font-size: 14px;
+  line-height: 1;
+}
 
-  .add-device-button {
-    margin-top: 20px;
-    padding: 10px 20px;
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+.device-selector select {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  margin: 0; /* Remove any margins */
+  height: 36px; /* Set consistent height */
+}
 
-  .add-device-button:hover {
-    background-color: #1976D2;
-  }
+.device-details {
+  margin-top: 20px;
+}
+
+.warning-container {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 15px;
+  z-index: 1000;
+}
+
+.device-info-container {
+  padding: 20px 40px;
+  display: flex;
+  gap: 25px; /* Slightly reduced gap from 30px */
+  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start; /* Ensure left alignment */
+  align-items: flex-start;
+  max-width: none; /* Remove max-width to allow full width */
+  margin: 0; /* Remove auto margins */
+}
+
+.device-info-button {
+  position: relative;  /* Ensure this is set for absolute positioning of child */
+  bottom: auto;       /* Remove fixed positioning */
+  left: auto;        /* Remove fixed positioning */
+  width: 245px;  /* Reduced from 250px to fit 5 in a row */
+  height: 245px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px; /* Reduce from 8px to 4px for a more square look */
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-size: 17px; /* Adjusted for the new size */
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;  /* Prevent shrinking */
+  margin-bottom: 20px; /* Add space between rows when they wrap */
+}
+
+.device-info-button.warning {
+  background-color: #f44336;
+}
+
+.device-info-button:hover {
+  background-color: #45a049;
+}
+
+.device-info-button.warning:hover {
+  background-color: #d32f2f;
+}
+
+/* Add styles for the button container to maintain consistent spacing */
+.device-button-container {
+  position: relative; /* For proper positioning context */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0; /* Remove margin since we're using gap */
+  width: 235px; /* Match the new button width */
+}
+
+.remove-device-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 1;
+  padding: 0;
+  transition: background-color 0.3s ease;
+}
+
+.remove-device-button:hover {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.add-device-button {
+  margin-top: 0; /* Remove top margin since we're horizontal now */
+  height: 36px; /* Match the height of the dropdowns */
+  padding: 0 16px; /* Adjust horizontal padding only */
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-end; /* Align with the bottom of the dropdowns */
+  margin-bottom: 2px; /* Slight adjustment to align with dropdowns */
+}
+
+.add-device-button:hover {
+  background-color: #1976D2;
+}
 
