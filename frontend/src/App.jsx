@@ -9,9 +9,15 @@ const App = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [activeDevices, setActiveDevices] = useState([]);
+  const activeDevicesRef = useRef(activeDevices); // Ref to hold current active devices for cleanup
   const [audioContext] = useState(() => new (window.AudioContext || window.webkitAudioContext)());
   const [workletLoaded, setWorkletLoaded] = useState(false);
   const socketRef = useRef(null);
+
+  // Keep the ref updated with the latest activeDevices
+  useEffect(() => {
+    activeDevicesRef.current = activeDevices;
+  }, [activeDevices]);
 
   // Load audio worklet when component mounts
   useEffect(() => {
@@ -47,7 +53,7 @@ const App = () => {
     fetchAudioDevices();
   }, []);
 
-  // Connect to websocket server
+  // Connect to websocket server - runs only once on mount
   useEffect(() => {
     const socket = io("http://localhost:5000");
     socketRef.current = socket;
@@ -60,7 +66,7 @@ const App = () => {
       console.log("Disconnected from server");
     });
 
-    // --- MODIFIED WARNING HANDLER ---
+    // --- WARNING HANDLER (logic unchanged, but effect dependency removed) ---
     socket.on("warning", (data) => {
       console.log("Received warning:", data);
       const { deviceIndex, channel, message } = data; // Destructure new payload
@@ -71,6 +77,7 @@ const App = () => {
         return;
       }
 
+      // Use functional update form of setActiveDevices to avoid needing it in dependencies
       setActiveDevices(prevDevices => {
         let warningSet = false; // Flag to check if we found the device
         const updatedDevices = prevDevices.map(device => {
@@ -85,6 +92,7 @@ const App = () => {
             // Set a timeout to clear this specific warning after 5 seconds
             const timeoutId = setTimeout(() => {
               console.log(`Clearing warning for device ID: ${device.id}`);
+              // Use functional update form here too
               setActiveDevices(currentDevices =>
                 currentDevices.map(d =>
                   d.id === device.id ? { ...d, hasWarning: false, warningTimeout: null } : d
@@ -102,26 +110,28 @@ const App = () => {
         return updatedDevices; // Return the potentially updated list
       });
     });
-    // --- END MODIFIED WARNING HANDLER ---
+    // --- END WARNING HANDLER ---
 
+    // Cleanup function runs only on component unmount
     return () => {
-      // Clean up any monitored devices when component unmounts
-      activeDevices.forEach(device => {
+      console.log("Cleaning up WebSocket connection and stopping monitoring...");
+      // Use the ref to get the list of devices at the time of unmount
+      activeDevicesRef.current.forEach(device => {
         // Clear any pending warning timeouts
         if (device.warningTimeout) {
           clearTimeout(device.warningTimeout);
         }
         // Stop backend monitoring
+        console.log(`Emitting stop_audio for device ID: ${device.id}`);
         socket.emit('stop_audio', {
           deviceId: device.id,
-          // Ensure deviceIndex and channel are sent if needed by backend on stop
-          // deviceIndex: device.device.index,
-          // channel: device.channel
+          deviceIndex: device.device.index, // Send index/channel on stop
+          channel: device.channel
         });
       });
       socket.disconnect();
     };
-  }, [activeDevices]); // Add activeDevices as dependency to ensure cleanup uses the latest list
+  }, []); // <<-- REMOVED activeDevices from dependency array
 
   const handleDeviceSelect = (event) => {
     const deviceIndex = parseInt(event.target.value, 10);
