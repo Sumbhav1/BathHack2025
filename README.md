@@ -48,17 +48,17 @@ Built by Sumbhav, Finn and Alyson at Hackathon 2025
 1. **Clone the repository:**
 
    bash
-   git clone https://github.com/Sumbhav1/rf-audio-monitor.git
-   cd rf-audio-monitor
+   `git clone https://github.com/Sumbhav1/rf-audio-monitor.git
+   cd rf-audio-monitor`
 Frontend Setup:
 
 Navigate to the frontend/ directory.
 
-Run npm install to install the required dependencies.
+Run `npm install` to install the required dependencies.
 
 bash
-cd frontend
-npm install
+`cd frontend
+npm install`
 Backend Setup:
 
 Navigate to the backend/ directory.
@@ -66,14 +66,15 @@ Navigate to the backend/ directory.
 Install the Python dependencies from requirements.txt.
 
   bash
-  cd backend
-  pip install -r requirements.txt
+  `cd backend
+  pip install -r requirements.txt`
   Run the Application:
 
 Start the frontend:
 
-  ```bash
-  npm run dev
+  bash
+  `npm run dev`
+  
   In a new terminal, run the backend:
 
   ```bash
